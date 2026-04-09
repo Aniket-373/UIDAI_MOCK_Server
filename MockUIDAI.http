@@ -1,0 +1,6 @@
+@MockUIDAI_HostAddress = http://localhost:5250
+
+GET {{MockUIDAI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

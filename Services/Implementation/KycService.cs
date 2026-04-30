@@ -1,19 +1,42 @@
-// Services/Implementation/KycService.cs
 using System.Xml.Linq;
 using System.Text;
 
 public class KycService : IKycService
 {
+    private static readonly Random _random = new();
+
+    private (string uid, AadhaarUser user) GetRandomUser()
+    {
+        var users = AadhaarMockData.Users.ToList();
+        var index = _random.Next(users.Count);
+        var selected = users[index];
+
+        return (selected.Key, selected.Value);
+    }
+
     public string Process(string xml, string? scenario)
     {
         var uid = ExtractUid(xml);
 
+        // Force invalid scenario
         if (scenario == "INVALID_UID")
             return BuildError("998", "Invalid Aadhaar");
 
-        if (string.IsNullOrEmpty(uid))
-            return BuildError("510", "Invalid XML");
+        // Always random if explicitly asked
+        if (scenario == "RANDOM")
+        {
+            var (randomUid, randomUser) = GetRandomUser();
+            return BuildSuccess(randomUser, randomUid);
+        }
 
+        // If UID NOT passed → return random instead of error
+        if (string.IsNullOrEmpty(uid))
+        {
+            var (randomUid, randomUser) = GetRandomUser();
+            return BuildSuccess(randomUser, randomUid);
+        }
+
+        
         if (!AadhaarMockData.Users.ContainsKey(uid))
             return BuildError("998", "Invalid Aadhaar");
 
@@ -36,8 +59,12 @@ public class KycService : IKycService
     }
 
     private string BuildSuccess(AadhaarUser user, string uid)
-    {
-        var kycXml = $"""
+{
+    var fakePdfContent = $"Aadhaar PDF for {user.Name}";
+    var pdfBytes = System.Text.Encoding.UTF8.GetBytes(fakePdfContent);
+    var pdfBase64 = Convert.ToBase64String(pdfBytes);
+
+    var kycXml = $"""
 <KycRes ret="Y" code="100" txn="UKC:{Guid.NewGuid()}"
         ts="{DateTime.UtcNow:o}" ttl="{DateTime.UtcNow.AddHours(1):o}">
     <UidData uid="{uid}">
@@ -45,25 +72,25 @@ public class KycService : IKycService
              phone="{user.Phone}" email="{user.Email}" />
         <Poa dist="{user.District}" state="{user.State}" pc="{user.Pincode}" />
         <LData lang="en" name="{user.Name}" />
-        <Pht></Pht>
+
+        <Pht>{Convert.ToBase64String(Guid.NewGuid().ToByteArray())}</Pht>
     </UidData>
+
+    <EadhaarPdf>{pdfBase64}</EadhaarPdf>
+
 </KycRes>
 """;
 
-        // var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(kycXml));
-
-        return $"""
+    return $"""
 <Resp status="0">
     <kycRes>{kycXml}</kycRes>
 </Resp>
 """;
-    }
+}
 
     private string BuildError(string code, string message)
     {
         var xml = $"""<KycRes ret="N" code="{code}" err="{message}" />""";
-
-        // var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(xml));
 
         return $"""
 <Resp status="-1">

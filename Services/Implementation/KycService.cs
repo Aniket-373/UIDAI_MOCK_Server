@@ -77,7 +77,7 @@ public class KycService : IKycService
         <Poi name="{user.Name}" dob="{user.Dob}" gender="{user.Gender}"
              phone="{user.Phone}" email="{user.Email}" />
 
-        <Poa co="S/O {user.CareOf}"
+        <Poa co="{user.CareOf}"
              house="{user.House}"
              street="{user.Street}"
              loc="{user.Locality}"

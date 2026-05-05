@@ -60,32 +60,40 @@ public class KycService : IKycService
 
     private string BuildSuccess(AadhaarUser user, string uid)
 {
+   
+    var maskedUid = $"XXXX-XXXX-{uid[^4..]}";
+
     var fakePdfContent = $"Aadhaar PDF for {user.Name}";
     var pdfBytes = System.Text.Encoding.UTF8.GetBytes(fakePdfContent);
     var pdfBase64 = Convert.ToBase64String(pdfBytes);
 
+    var photoBase64 = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+
     var kycXml = $"""
-<KycRes ret="Y" code="100" txn="UKC:{Guid.NewGuid()}"
-        ts="{DateTime.UtcNow:o}" ttl="{DateTime.UtcNow.AddHours(1):o}">
-    <UidData uid="{uid}">
+<KycRes ret="y" code="100" txn="UKC:{Guid.NewGuid()}"
+        ts="{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss}"
+        ttl="{DateTime.UtcNow.AddYears(4):yyyy-MM-ddTHH:mm:ss}">
+    <UidData uid="{maskedUid}" tkn="AGENCY_TOKEN_{Random.Shared.Next(1000,9999)}">
         <Poi name="{user.Name}" dob="{user.Dob}" gender="{user.Gender}"
              phone="{user.Phone}" email="{user.Email}" />
-        <Poa dist="{user.District}" state="{user.State}" pc="{user.Pincode}" />
-        <LData lang="en" name="{user.Name}" />
 
-        <Pht>{Convert.ToBase64String(Guid.NewGuid().ToByteArray())}</Pht>
+        <Poa co="S/O {user.CareOf}"
+             house="{user.House}"
+             street="{user.Street}"
+             loc="{user.Locality}"
+             vtc="{user.VillageTown}"
+             dist="{user.District}"
+             state="{user.State}"
+             pc="{user.Pincode}" />
+
+        <Pht>{photoBase64}</Pht>
+
+        <Prn type="pdf">{pdfBase64}</Prn>
     </UidData>
-
-    <EadhaarPdf>{pdfBase64}</EadhaarPdf>
-
 </KycRes>
 """;
 
-    return $"""
-<Resp status="0">
-    <kycRes>{kycXml}</kycRes>
-</Resp>
-""";
+    return kycXml;
 }
 
     private string BuildError(string code, string message)
